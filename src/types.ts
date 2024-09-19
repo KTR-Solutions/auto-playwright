@@ -1,4 +1,5 @@
 import { type TestType } from "@playwright/test";
+import OpenAI from "openai";
 
 export { type Page } from "@playwright/test";
 
@@ -25,4 +26,5 @@ export type TaskResult = {
   assertion?: boolean;
   query?: string;
   errorMessage?: string;
+  usage?: OpenAI.Completions.CompletionUsage;
 };

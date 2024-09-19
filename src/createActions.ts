@@ -1,7 +1,61 @@
-import { Page } from "@playwright/test";
+import { Locator, Page } from "@playwright/test";
 import { randomUUID } from "crypto";
 import { RunnableFunctionWithParse } from "openai/lib/RunnableFunction";
 import { z } from "zod";
+
+type ERole = "alert" | "alertdialog" | "application" | "article" | "banner" | "blockquote" | "button" | "caption" | "cell" | "checkbox" | "code" | "columnheader" | "combobox" | "complementary" | "contentinfo" | "definition" | "deletion" | "dialog" | "directory" | "document" | "emphasis" | "feed" | "figure" | "form" | "generic" | "grid" | "gridcell" | "group" | "heading" | "img" | "insertion" | "link" | "list" | "listbox" | "listitem" | "log" | "main" | "marquee" | "math" | "meter" | "menu" | "menubar" | "menuitem" | "menuitemcheckbox" | "menuitemradio" | "navigation" | "none" | "note" | "option" | "paragraph" | "presentation" | "progressbar" | "radio" | "radiogroup" | "region" | "row" | "rowgroup" | "rowheader" | "scrollbar" | "search" | "searchbox" | "separator" | "slider" | "spinbutton" | "status" | "strong" | "subscript" | "superscript" | "switch" | "tab" | "table" | "tablist" | "tabpanel" | "term" | "textbox" | "time" | "timer" | "toolbar" | "tooltip" | "tree" | "treegrid" | "treeitem";
+const eRoleArr = ["alert" , "alertdialog" , "application" , "article" , "banner" , "blockquote" , "button" , "caption" , "cell" , "checkbox" , "code" , "columnheader" , "combobox" , "complementary" , "contentinfo" , "definition" , "deletion" , "dialog" , "directory" , "document" , "emphasis" , "feed" , "figure" , "form" , "generic" , "grid" , "gridcell" , "group" , "heading" , "img" , "insertion" , "link" , "list" , "listbox" , "listitem" , "log" , "main" , "marquee" , "math" , "meter" , "menu" , "menubar" , "menuitem" , "menuitemcheckbox" , "menuitemradio" , "navigation" , "none" , "note" , "option" , "paragraph" , "presentation" , "progressbar" , "radio" , "radiogroup" , "region" , "row" , "rowgroup" , "rowheader" , "scrollbar" , "search" , "searchbox" , "separator" , "slider" , "spinbutton" , "status" , "strong" , "subscript" , "superscript" , "switch" , "tab" , "table" , "tablist" , "tabpanel" , "term" , "textbox" , "time" , "timer" , "toolbar" , "tooltip" , "tree" , "treegrid" , "treeitem"];
+
+async function checkLocator(locator: Locator, type: string, args: any) {
+    const elements = await locator.all();
+
+    if (elements.length > 1) {
+      const elementPaths = [];
+        for (let i = 0; i < elements.length; i++) {
+            const elementLocator = locator.nth(i);
+
+            // Try to get the ID
+            const id = await elementLocator.getAttribute('id');
+            if (id) {
+                console.log(`Element ${i + 1} unique selector: #${id}`);
+                elementPaths.push(`#${id}`);
+                continue;
+            }
+
+            // Try to get a class name if ID is not available
+            const className = await elementLocator.getAttribute('class');
+            if (className) {
+                console.log(`Element ${i + 1} unique selector: .${className.replace(/\s+/g, '.')}`);
+                elementPaths.push(`.${className.replace(/\s+/g, '.')}`);
+                continue;
+            }
+
+            // Fall back to generating an XPath
+            const xpath = await elementLocator.evaluate((el) => {
+                const idx = Array.from(el.parentNode!.children).indexOf(el) + 1;
+                const tag = el.tagName.toLowerCase();
+                return `//${tag}[${idx}]`;
+            });
+            console.log(`Element ${i + 1} unique selector: ${xpath}`);
+            elementPaths.push(xpath);
+        }
+        return {
+          errorMessage: `Multiple elements found for locator '${type}' with arguments ${JSON.stringify(args)}`,
+          type: type,
+          args: args,
+          elements: elementPaths,
+        }
+    } else if (elements.length === 1) {
+        console.log(`Found 1 element:`, elements[0]);
+        return {
+          success: true
+        }
+    } else {
+        return {
+          errorMessage: `No element found for locator '${type}' with arguments ${JSON.stringify(args)}`,
+        }
+    }
+}
 
 export const createActions = (
   page: Page
@@ -19,9 +73,157 @@ export const createActions = (
   };
 
   return {
+    locateElementByText: {
+      function: async (args: { text: string }) => {
+        const locator = page.getByText(args.text);
+        const locatorResult = await checkLocator(locator, 'getByText', args);
+        if (locatorResult.errorMessage) {
+          return locatorResult;
+        }
+
+        const elementId = randomUUID();
+
+        locatorMap.set(elementId, locator);
+
+        return {
+          elementId,
+        };
+      },
+      name: "locateElementByText",
+      description:
+        "Locates element containing given text and returns elementId. This element ID can be used with other functions to perform actions on the element.",
+      parse: (args: string) => {
+        return z
+          .object({
+            text: z.string(),
+          })
+          .parse(JSON.parse(args));
+      },
+      parameters: {
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+          },
+        },
+      },
+    },
+    locateElementByLabel: {
+      function: async (args: { label: string }) => {
+        const locator = page.getByLabel(args.label);
+        const locatorResult = await checkLocator(locator, 'getByLabel', args);
+        if (locatorResult.errorMessage) {
+          return locatorResult;
+        }
+
+        const elementId = randomUUID();
+
+        locatorMap.set(elementId, locator);
+
+        return {
+          elementId,
+        };
+      },
+      name: "locateElementByLabel",
+      description:
+        "Locates element with the given label and returns elementId. This element ID can be used with other functions to perform actions on the element.",
+      parse: (args: string) => {
+        return z
+          .object({
+            label: z.string(),
+          })
+          .parse(JSON.parse(args));
+      },
+      parameters: {
+        type: "object",
+        properties: {
+          label: {
+            type: "string",
+          },
+        },
+      },
+    },
+    locateElementByTestId: {
+      function: async (args: { testId: string }) => {
+        const locator = page.getByTestId(args.testId);
+        const locatorResult = await checkLocator(locator, 'getByTestId', args);
+        if (locatorResult.errorMessage) {
+          return locatorResult;
+        }
+
+        const elementId = randomUUID();
+
+        locatorMap.set(elementId, locator);
+
+        return {
+          elementId,
+        };
+      },
+      name: "locateElementByTestId",
+      description: 
+        "Locates element containing given testId and returns elementId. This element ID can be used with other functions to perform actions on the element.",
+      parse: (args: string) => {
+        return z
+          .object({
+            testId: z.string(),
+          })
+          .parse(JSON.parse(args));
+      },
+      parameters: {
+        type: "object",
+        properties: {
+          testId: {
+            type: "string",
+          },
+        },
+      },
+    },
+    locateElementByRole: {
+      function: async (args: { role: ERole; name: string }) => {
+        const locator = page.getByRole(args.role, { name: args.name })
+        const locatorResult = await checkLocator(locator, 'getByRole', args);
+        if (locatorResult.errorMessage) {
+          return locatorResult;
+        }
+
+        const elementId = randomUUID();
+
+        locatorMap.set(elementId, locator);
+
+        return {
+          elementId,
+        };
+      },
+      name: "locateElementByRole",
+      description:
+        `Locates element by their role (one of :${eRoleArr.join(",")}) and returns elementId. This element ID can be used with other functions to perform actions on the element.`,
+      parse: (args: string) => {
+        return z
+          .object({
+            role: z.string(),
+            name: z.string(),
+          })
+          .parse(JSON.parse(args));
+      },
+      parameters: {
+        type: "object",
+        properties: {
+          role: {
+            type: "string",
+          },
+          name: {
+            type: "string",
+          },
+        },
+      },
+    },
     locateElement: {
       function: async (args: { cssSelector: string }) => {
-        const locator = await page.locator(args.cssSelector);
+        const locator = page.locator(args.cssSelector);
+        const locatorResult = await checkLocator(locator, 'locator', args);
+        if (locatorResult.errorMessage) {
+          return locatorResult;
+        }
 
         const elementId = randomUUID();
 
@@ -417,7 +619,9 @@ export const createActions = (
     },
     locator_click: {
       function: async (args: { elementId: string }) => {
-        await getLocator(args.elementId).click();
+        // .dispatchEvent('click');
+        // TODO: WORKAROUND - click through stuff in the way
+        await getLocator(args.elementId).click({ force: true });
 
         return { success: true };
       },

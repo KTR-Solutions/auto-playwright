@@ -216,6 +216,10 @@ console.log(`"There are 3 links" is a ${thereAreThreeLinks} statement`);
 - `locator.textContent`
 - `locator.uncheck`
 - `page.goto`
+- `page.getByText`
+- `page.getByTestId`
+- `page.getByLabel`
+- `page.getByRole('button', { name: 'Done' })`
 
 Adding new actions is easy: just update the `functions` in [`src/completeTask.ts`](src/completeTask.ts).
 

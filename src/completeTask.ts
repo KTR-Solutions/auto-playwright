@@ -1,7 +1,7 @@
 import OpenAI from "openai";
-import { type Page, TaskMessage, TaskResult } from "./types";
-import { prompt } from "./prompt";
 import { createActions } from "./createActions";
+import { prompt } from "./prompt";
+import { type Page, TaskMessage, TaskResult } from "./types";
 
 const defaultDebug = process.env.AUTO_PLAYWRIGHT_DEBUG === "true";
 
@@ -34,22 +34,26 @@ export const completeTask = async (
     })
     .on("message", (message) => {
       if (debug) {
-        console.log("> message", message);
+        console.log("> message", JSON.stringify(message, null, 2));
       }
 
       if (
         message.role === "assistant" &&
         message.tool_calls &&
-        message.tool_calls.length > 0 &&
-        message.tool_calls[0].function.name.startsWith("result")
+        message.tool_calls.length > 0
       ) {
+        // console.log("> TOOL_CALL JSON", JSON.stringify(message));
+        if (message.tool_calls[0].function.name.startsWith("result")) {
+          // console.log(`> RESULT!!! ${message.tool_calls[0].function.arguments}`);
         lastFunctionResult = JSON.parse(
           message.tool_calls[0].function.arguments
         );
       }
+      }
     });
 
   const finalContent = await runner.finalContent();
+  const totalUsage = await runner.totalUsage()
 
   if (debug) {
     console.log("> finalContent", finalContent);
@@ -63,5 +67,5 @@ export const completeTask = async (
     console.log("> lastFunctionResult", lastFunctionResult);
   }
 
-  return lastFunctionResult;
+  return Object.assign({}, lastFunctionResult, { usage: totalUsage });
 };
