@@ -2,55 +2,65 @@ import { Locator, Page } from "@playwright/test";
 import { randomUUID } from "crypto";
 import { RunnableFunctionWithParse } from "openai/lib/RunnableFunction";
 import { z } from "zod";
+import { TestRecorder } from "./simplifAi";
 
 type ERole = "alert" | "alertdialog" | "application" | "article" | "banner" | "blockquote" | "button" | "caption" | "cell" | "checkbox" | "code" | "columnheader" | "combobox" | "complementary" | "contentinfo" | "definition" | "deletion" | "dialog" | "directory" | "document" | "emphasis" | "feed" | "figure" | "form" | "generic" | "grid" | "gridcell" | "group" | "heading" | "img" | "insertion" | "link" | "list" | "listbox" | "listitem" | "log" | "main" | "marquee" | "math" | "meter" | "menu" | "menubar" | "menuitem" | "menuitemcheckbox" | "menuitemradio" | "navigation" | "none" | "note" | "option" | "paragraph" | "presentation" | "progressbar" | "radio" | "radiogroup" | "region" | "row" | "rowgroup" | "rowheader" | "scrollbar" | "search" | "searchbox" | "separator" | "slider" | "spinbutton" | "status" | "strong" | "subscript" | "superscript" | "switch" | "tab" | "table" | "tablist" | "tabpanel" | "term" | "textbox" | "time" | "timer" | "toolbar" | "tooltip" | "tree" | "treegrid" | "treeitem";
 const eRoleArr = ["alert" , "alertdialog" , "application" , "article" , "banner" , "blockquote" , "button" , "caption" , "cell" , "checkbox" , "code" , "columnheader" , "combobox" , "complementary" , "contentinfo" , "definition" , "deletion" , "dialog" , "directory" , "document" , "emphasis" , "feed" , "figure" , "form" , "generic" , "grid" , "gridcell" , "group" , "heading" , "img" , "insertion" , "link" , "list" , "listbox" , "listitem" , "log" , "main" , "marquee" , "math" , "meter" , "menu" , "menubar" , "menuitem" , "menuitemcheckbox" , "menuitemradio" , "navigation" , "none" , "note" , "option" , "paragraph" , "presentation" , "progressbar" , "radio" , "radiogroup" , "region" , "row" , "rowgroup" , "rowheader" , "scrollbar" , "search" , "searchbox" , "separator" , "slider" , "spinbutton" , "status" , "strong" , "subscript" , "superscript" , "switch" , "tab" , "table" , "tablist" , "tabpanel" , "term" , "textbox" , "time" , "timer" , "toolbar" , "tooltip" , "tree" , "treegrid" , "treeitem"];
 
-async function checkLocator(locator: Locator, type: string, args: any) {
-    const elements = await locator.all();
 
-    if (elements.length > 1) {
+async function appendToFile(command: string) {
+  TestRecorder.getInstance().addCommand(command);
+}
+
+async function checkLocator(locator: Locator, type: string, args: any) {
+    const elements = await locator.elementHandles();
+
+    if (elements.length > 0) {
       const elementPaths = [];
         for (let i = 0; i < elements.length; i++) {
             const elementLocator = locator.nth(i);
 
+            const elementHandle = await elementLocator.elementHandle();
+            if (elementHandle) {
+              // You now have access to the underlying DOM element
+              const className = await elementHandle.evaluate(el => el.className);
+              const selector = className
+                .split(' ')
+                .filter((cls: string) => !cls.includes('.'))
+                .join('.');
+              // const selector = unique(element);
+              elementPaths.push(selector);
+              console.log(`The element ${i} selector is: ${selector}`);
+              // console.log(`The element ${i} selector is: ${selector}`);
+            } else {
+              console.log(`Element ${i} not found`);
+            }
+          }
+
             // Try to get the ID
-            const id = await elementLocator.getAttribute('id');
-            if (id) {
-                console.log(`Element ${i + 1} unique selector: #${id}`);
-                elementPaths.push(`#${id}`);
-                continue;
-            }
+            // const id = await elementLocator.getAttribute('id');
+            // if (id) {
+            //     // console.log(`Element ${i + 1} unique selector: #${id}`);
+            //     elementPaths.push(`#${id}`);
+            //     continue;
+            // }
 
-            // Try to get a class name if ID is not available
-            const className = await elementLocator.getAttribute('class');
-            if (className) {
-                console.log(`Element ${i + 1} unique selector: .${className.replace(/\s+/g, '.')}`);
-                elementPaths.push(`.${className.replace(/\s+/g, '.')}`);
-                continue;
-            }
-
-            // Fall back to generating an XPath
-            const xpath = await elementLocator.evaluate((el) => {
-                const idx = Array.from(el.parentNode!.children).indexOf(el) + 1;
-                const tag = el.tagName.toLowerCase();
-                return `//${tag}[${idx}]`;
-            });
-            console.log(`Element ${i + 1} unique selector: ${xpath}`);
-            elementPaths.push(xpath);
+        if (elements.length === 1) {
+          console.log(`Element found for locator '${type}' with arguments ${JSON.stringify(args)}, path: ${elementPaths[0]}`);
+          return {
+            elements: elementPaths,
+            success: true
+          }
         }
+        console.log(`Multiple elements found for locator '${type}' with arguments ${JSON.stringify(args)}, paths: ${elementPaths}`);
         return {
           errorMessage: `Multiple elements found for locator '${type}' with arguments ${JSON.stringify(args)}`,
           type: type,
           args: args,
           elements: elementPaths,
         }
-    } else if (elements.length === 1) {
-        console.log(`Found 1 element:`, elements[0]);
-        return {
-          success: true
-        }
     } else {
+        console.log(`No element found for locator '${type}' with arguments ${JSON.stringify(args)}`);
         return {
           errorMessage: `No element found for locator '${type}' with arguments ${JSON.stringify(args)}`,
         }
@@ -61,6 +71,7 @@ export const createActions = (
   page: Page
 ): Record<string, RunnableFunctionWithParse<any>> => {
   const locatorMap = new Map();
+  const locatorMap2 = new Map();
 
   const getLocator = (elementId: string) => {
     const locator = locatorMap.get(elementId);
@@ -70,6 +81,16 @@ export const createActions = (
     }
 
     return locator;
+  };
+
+  const getLocatorCommand = (elementId: string) => {
+    const command = locatorMap2.get(elementId);
+
+    if (!command) {
+      throw new Error('Unknown elementId "' + elementId + '"');
+    }
+
+    return command;
   };
 
   return {
@@ -84,6 +105,7 @@ export const createActions = (
         const elementId = randomUUID();
 
         locatorMap.set(elementId, locator);
+        locatorMap2.set(elementId, `page.getByText("${args.text}")`);
 
         return {
           elementId,
@@ -119,6 +141,7 @@ export const createActions = (
         const elementId = randomUUID();
 
         locatorMap.set(elementId, locator);
+        locatorMap2.set(elementId, `page.getByLabel("${args.label}")`);
 
         return {
           elementId,
@@ -154,6 +177,7 @@ export const createActions = (
         const elementId = randomUUID();
 
         locatorMap.set(elementId, locator);
+        locatorMap2.set(elementId, `page.getByTestId("${args.testId}")`);
 
         return {
           elementId,
@@ -189,6 +213,7 @@ export const createActions = (
         const elementId = randomUUID();
 
         locatorMap.set(elementId, locator);
+        locatorMap2.set(elementId, `page.getByRole("${args.role}", { name: "${args.name}" })`);
 
         return {
           elementId,
@@ -228,6 +253,7 @@ export const createActions = (
         const elementId = randomUUID();
 
         locatorMap.set(elementId, locator);
+        locatorMap2.set(elementId, `page.locator("${args.cssSelector}")`);
 
         return {
           elementId,
@@ -254,6 +280,8 @@ export const createActions = (
     },
     locator_evaluate: {
       function: async (args: { pageFunction: string; elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.evaluate("${args.pageFunction}")`;
+        appendToFile(command);
         return {
           result: await getLocator(args.elementId).evaluate(args.pageFunction),
         };
@@ -285,6 +313,8 @@ export const createActions = (
     },
     locator_getAttribute: {
       function: async (args: { attributeName: string; elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.getAttribute("${args.attributeName}")`;
+        appendToFile(command);
         return {
           attributeValue: await getLocator(args.elementId).getAttribute(
             args.attributeName
@@ -315,6 +345,8 @@ export const createActions = (
     },
     locator_innerHTML: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.innerHTML()`;
+        appendToFile(command);
         return { innerHTML: await getLocator(args.elementId).innerHTML() };
       },
       name: "locator_innerHTML",
@@ -337,6 +369,8 @@ export const createActions = (
     },
     locator_innerText: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.innerText()`;
+        appendToFile(command);
         return { innerText: await getLocator(args.elementId).innerText() };
       },
       name: "locator_innerText",
@@ -359,6 +393,8 @@ export const createActions = (
     },
     locator_textContent: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.textContent()`;
+        appendToFile(command);
         return {
           textContent: await getLocator(args.elementId).textContent(),
         };
@@ -383,6 +419,8 @@ export const createActions = (
     },
     locator_inputValue: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.inputValue()`;
+        appendToFile(command);
         return {
           inputValue: await getLocator(args.elementId).inputValue(),
         };
@@ -408,6 +446,8 @@ export const createActions = (
     },
     locator_blur: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.blur()`;
+        appendToFile(command);
         await getLocator(args.elementId).blur();
 
         return { success: true };
@@ -432,6 +472,8 @@ export const createActions = (
     },
     locator_boundingBox: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.boundingBox()`;
+        appendToFile(command);
         return await getLocator(args.elementId).boundingBox();
       },
       name: "locator_boundingBox",
@@ -455,6 +497,8 @@ export const createActions = (
     },
     locator_check: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.check()`;
+        appendToFile(command);
         await getLocator(args.elementId).check();
 
         return { success: true };
@@ -479,6 +523,8 @@ export const createActions = (
     },
     locator_uncheck: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.uncheck()`;
+        appendToFile(command);
         await getLocator(args.elementId).uncheck();
 
         return { success: true };
@@ -503,6 +549,8 @@ export const createActions = (
     },
     locator_isChecked: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.isChecked()`;
+        appendToFile(command);
         return { isChecked: await getLocator(args.elementId).isChecked() };
       },
       name: "locator_isChecked",
@@ -525,6 +573,8 @@ export const createActions = (
     },
     locator_isEditable: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.isEditable()`;
+        appendToFile(command);
         return {
           isEditable: await getLocator(args.elementId).isEditable(),
         };
@@ -550,6 +600,8 @@ export const createActions = (
     },
     locator_isEnabled: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.isEnabled()`;
+        appendToFile(command);
         return { isEnabled: await getLocator(args.elementId).isEnabled() };
       },
       name: "locator_isEnabled",
@@ -573,6 +625,8 @@ export const createActions = (
     },
     locator_isVisible: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.isVisible()`;
+        appendToFile(command);
         return { isVisible: await getLocator(args.elementId).isVisible() };
       },
       name: "locator_isVisible",
@@ -595,6 +649,8 @@ export const createActions = (
     },
     locator_clear: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.clear()`;
+        appendToFile(command);
         await getLocator(args.elementId).clear();
 
         return { success: true };
@@ -619,6 +675,8 @@ export const createActions = (
     },
     locator_click: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.click({ force: true })`;
+        appendToFile(command);
         // .dispatchEvent('click');
         // TODO: WORKAROUND - click through stuff in the way
         await getLocator(args.elementId).click({ force: true });
@@ -643,8 +701,40 @@ export const createActions = (
         },
       },
     },
+    locator_selectOption: {
+      function: async (args: { elementId: string, option: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.selectOption("${args.option}")`;
+        appendToFile(command);
+        await getLocator(args.elementId).selectOption(args.option);
+
+        return { success: true };
+      },
+      name: "locator_selectOption",
+      description: "Select an option from a dropdown/select element.",
+      parse: (args: string) => {
+        return z
+          .object({
+            elementId: z.string(),
+            option: z.string(),
+          })
+          .parse(JSON.parse(args));
+      },
+      parameters: {
+        type: "object",
+        properties: {
+          elementId: {
+            type: "string",
+          },
+          option: {
+            type: "string",
+          },
+        },
+      },
+    },
     locator_count: {
       function: async (args: { elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.count()`;
+        appendToFile(command);
         return { elementCount: await getLocator(args.elementId).count() };
       },
       name: "locator_count",
@@ -667,6 +757,8 @@ export const createActions = (
     },
     locator_fill: {
       function: async (args: { value: string; elementId: string }) => {
+        const command = `${getLocatorCommand(args.elementId)}.fill("${args.value}")`;
+        appendToFile(command);
         await getLocator(args.elementId).fill(args.value);
 
         return {
@@ -697,27 +789,26 @@ export const createActions = (
     },
     page_goto: {
       function: async (args: { url: string }) => {
+        const command = `page.goto("${args.url}")`;
+        appendToFile(command);
         return {
           url: await page.goto(args.url),
+          success: true
         };
       },
       name: "page_goto",
-      description: "Set a value to the input field.",
+      description: "Go (navigate) to a specific page on the page e.g. /home, /test/1234. this is an action, run resultAction after",
       parse: (args: string) => {
         return z
           .object({
-            cssLocator: z.string(),
-            value: z.string(),
+            url: z.string(),
           })
           .parse(JSON.parse(args));
       },
       parameters: {
         type: "object",
         properties: {
-          value: {
-            type: "string",
-          },
-          cssLocator: {
+          url: {
             type: "string",
           },
         },

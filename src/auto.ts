@@ -52,14 +52,15 @@ async function runTask(
       `Provided task string is too long, max length is ${MAX_TASK_CHARS} chars.`
     );
   }
-
+  const model = options?.model ?? "gpt-4o-mini";
+  const debug = options?.debug ?? true;
   const result = await completeTask(page, {
     task,
     snapshot: await getSnapshot(page),
     options: options
       ? {
-          model: options.model ?? "gpt-4o",
-          debug: options.debug ?? false,
+          model: model,
+          debug: debug,
           openaiApiKey: options.openaiApiKey,
           openaiBaseUrl: options.openaiBaseUrl,
           openaiDefaultQuery: options.openaiDefaultQuery,
@@ -73,12 +74,14 @@ async function runTask(
   let inputCost = 0;
   let outputCost = 0;
   
-  if (options?.model === "gpt-4o") {
+  if (model === "gpt-4o") {
     inputCost = (totalUsage.prompt_tokens || 0) * 0.000005;
     outputCost = (totalUsage.completion_tokens || 0) * 0.000015;
-  } else if (options?.model === "gpt-4o-mini") {
+  } else if (model === "gpt-4o-mini") {
     inputCost = (totalUsage.prompt_tokens || 0) * 0.00000015;
     outputCost = (totalUsage.completion_tokens || 0) * 0.0000006;
+  } else {
+    console.error(`WARNING: Unknown model: ${model}`);
   }
   
   const totalCost = inputCost + outputCost;
@@ -86,7 +89,9 @@ async function runTask(
   // Add the current cost to the global totalCostSum
   totalCostSum += totalCost;
 
-  console.log(`COST: [task=${task}, model=${options?.model}, prompt=${totalUsage.prompt_tokens}, completion=${totalUsage.completion_tokens}, Cost=${totalCost.toFixed(2)}$]`);
-  console.log(`Total Accumulated Cost: ${totalCostSum.toFixed(2)}$`);
+  if (debug) {
+    console.log(`COST: [task=${task}, model=${model}, prompt=${totalUsage.prompt_tokens}, completion=${totalUsage.completion_tokens}, Cost=${totalCost.toFixed(2)}$]`);
+    console.log(`Total Accumulated Cost: ${totalCostSum.toFixed(2)}$`);
+  }
   return result;
 }

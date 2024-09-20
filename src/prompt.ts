@@ -20,6 +20,9 @@ export const prompt = (message: TaskMessage) => {
 * If locating an element using one tool fails, try at least 3 different tools to locate the element, you can also retry a tool with different arguments (e.g. after trying label, try role).
 * Make sure to run a result function every time to get the final result!!
 * Don't run multiple tools to find an element at the same time, start with one and if the element is not found try another tool.
+* To whats in the description of the test. Nothing more, nothing less. Don't hallucinate.
+* If there are multiple elements in a tool response, pick one and try proceeding with this one. If it fails, try another one.
+* In case of selecting a value (VALUE_TO_SELECT) in a dropdown, try the following: getByRole('button', { name: 'Not selected' }).click() and then page.getByLabel('Not selected').getByText('VALUE_TO_SELECT').click()
 
 Webpage snapshot:
 

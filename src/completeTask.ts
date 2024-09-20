@@ -25,7 +25,7 @@ export const completeTask = async (
 
   const runner = openai.beta.chat.completions
     .runTools({
-      model: task.options?.model ?? "gpt-4o",
+      model: task.options?.model ?? "gpt-4o-mini",
       messages: [{ role: "user", content: prompt(task) }],
       tools: Object.values(actions).map((action) => ({
         type: "function",
