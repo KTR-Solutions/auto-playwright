@@ -36,6 +36,6 @@ export class TestRecorder {
 
 export const simplifAi = (testName: string) => {
   TestRecorder.getInstance().setTestName(testName);
-  fs.appendFileSync('output.spec.ts', TestRecorder.getInstance().getTestCase());
+  fs.writeFileSync('output.spec.ts', TestRecorder.getInstance().getTestCase());
 }
 TestRecorder.getInstance()

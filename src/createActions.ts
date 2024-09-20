@@ -13,56 +13,34 @@ async function appendToFile(command: string) {
 }
 
 async function checkLocator(locator: Locator, type: string, args: any) {
-    const elements = await locator.elementHandles();
+    const elementsCount = await locator.count();
 
-    if (elements.length > 0) {
-      const elementPaths = [];
-        for (let i = 0; i < elements.length; i++) {
-            const elementLocator = locator.nth(i);
-
-            const elementHandle = await elementLocator.elementHandle();
-            if (elementHandle) {
-              // You now have access to the underlying DOM element
-              const className = await elementHandle.evaluate(el => el.className);
-              const selector = className
-                .split(' ')
-                .filter((cls: string) => !cls.includes('.'))
-                .join('.');
-              // const selector = unique(element);
-              elementPaths.push(selector);
-              console.log(`The element ${i} selector is: ${selector}`);
-              // console.log(`The element ${i} selector is: ${selector}`);
-            } else {
-              console.log(`Element ${i} not found`);
-            }
-          }
-
-            // Try to get the ID
-            // const id = await elementLocator.getAttribute('id');
-            // if (id) {
-            //     // console.log(`Element ${i + 1} unique selector: #${id}`);
-            //     elementPaths.push(`#${id}`);
-            //     continue;
-            // }
-
-        if (elements.length === 1) {
-          console.log(`Element found for locator '${type}' with arguments ${JSON.stringify(args)}, path: ${elementPaths[0]}`);
+    if (elementsCount > 0) {
+      const locators = [];
+      for (var index= 0; index < elementsCount ; index++) {
+            const elementLocator = locator.nth(index);
+            locators.push(elementLocator);
+      }
+        if (elementsCount === 1) {
+          console.log(`Element found for locator '${type}' with arguments ${JSON.stringify(args)}`);
           return {
-            elements: elementPaths,
+            locators: [locator],
             success: true
           }
         }
-        console.log(`Multiple elements found for locator '${type}' with arguments ${JSON.stringify(args)}, paths: ${elementPaths}`);
+        console.log(`Multiple elements found for locator '${type}' with arguments ${JSON.stringify(args)}`);
         return {
-          errorMessage: `Multiple elements found for locator '${type}' with arguments ${JSON.stringify(args)}`,
+          // errorMessage: `Multiple elements found for locator '${type}' with arguments ${JSON.stringify(args)}`,
           type: type,
           args: args,
-          elements: elementPaths,
+          // elements: elementPaths,
+          locators: locators
         }
     } else {
         console.log(`No element found for locator '${type}' with arguments ${JSON.stringify(args)}`);
         return {
           errorMessage: `No element found for locator '${type}' with arguments ${JSON.stringify(args)}`,
+          locators: [locator]
         }
     }
 }
@@ -98,17 +76,20 @@ export const createActions = (
       function: async (args: { text: string }) => {
         const locator = page.getByText(args.text);
         const locatorResult = await checkLocator(locator, 'getByText', args);
+
         if (locatorResult.errorMessage) {
           return locatorResult;
         }
-
-        const elementId = randomUUID();
-
-        locatorMap.set(elementId, locator);
-        locatorMap2.set(elementId, `page.getByText("${args.text}")`);
+        const elementIds = [];
+        for (var index= 0; index < locatorResult.locators.length ; index++) {
+            const elementId = randomUUID();
+            elementIds.push(elementId);
+            locatorMap.set(elementId, locatorResult.locators[index]);
+            locatorMap2.set(elementId, `page.getByText("${args.text}").nth(${index})`);
+        }
 
         return {
-          elementId,
+          elementIds: elementIds,
         };
       },
       name: "locateElementByText",
@@ -137,14 +118,16 @@ export const createActions = (
         if (locatorResult.errorMessage) {
           return locatorResult;
         }
-
-        const elementId = randomUUID();
-
-        locatorMap.set(elementId, locator);
-        locatorMap2.set(elementId, `page.getByLabel("${args.label}")`);
+        const elementIds = [];
+        for (var index= 0; index < locatorResult.locators.length ; index++) {
+            const elementId = randomUUID();
+            elementIds.push(elementId);
+            locatorMap.set(elementId, locatorResult.locators[index]);
+            locatorMap2.set(elementId, `page.getByLabel("${args.label}").nth(${index})`);
+        }
 
         return {
-          elementId,
+          elementIds: elementIds,
         };
       },
       name: "locateElementByLabel",
@@ -173,14 +156,16 @@ export const createActions = (
         if (locatorResult.errorMessage) {
           return locatorResult;
         }
-
-        const elementId = randomUUID();
-
-        locatorMap.set(elementId, locator);
-        locatorMap2.set(elementId, `page.getByTestId("${args.testId}")`);
+        const elementIds = [];
+        for (var index= 0; index < locatorResult.locators.length ; index++) {
+            const elementId = randomUUID();
+            elementIds.push(elementId);
+            locatorMap.set(elementId, locatorResult.locators[index]);
+            locatorMap2.set(elementId, `page.getByTestId("${args.testId}").nth(${index})`);
+        }
 
         return {
-          elementId,
+          elementIds: elementIds,
         };
       },
       name: "locateElementByTestId",
@@ -209,14 +194,16 @@ export const createActions = (
         if (locatorResult.errorMessage) {
           return locatorResult;
         }
-
-        const elementId = randomUUID();
-
-        locatorMap.set(elementId, locator);
-        locatorMap2.set(elementId, `page.getByRole("${args.role}", { name: "${args.name}" })`);
+        const elementIds = [];
+        for (var index= 0; index < locatorResult.locators.length ; index++) {
+            const elementId = randomUUID();
+            elementIds.push(elementId);
+            locatorMap.set(elementId, locatorResult.locators[index]);
+            locatorMap2.set(elementId, `page.getByRole("${args.role}", { name: "${args.name}").nth(${index})`);
+        }
 
         return {
-          elementId,
+          elementIds: elementIds,
         };
       },
       name: "locateElementByRole",
@@ -249,14 +236,16 @@ export const createActions = (
         if (locatorResult.errorMessage) {
           return locatorResult;
         }
-
-        const elementId = randomUUID();
-
-        locatorMap.set(elementId, locator);
-        locatorMap2.set(elementId, `page.locator("${args.cssSelector}")`);
+        const elementIds = [];
+        for (var index= 0; index < locatorResult.locators.length ; index++) {
+            const elementId = randomUUID();
+            elementIds.push(elementId);
+            locatorMap.set(elementId, locatorResult.locators[index]);
+            locatorMap2.set(elementId, `page.locator("${args.cssSelector}").nth(${index})`);
+        }
 
         return {
-          elementId,
+          elementIds: elementIds,
         };
       },
       name: "locateElement",
@@ -701,36 +690,36 @@ export const createActions = (
         },
       },
     },
-    locator_selectOption: {
-      function: async (args: { elementId: string, option: string }) => {
-        const command = `${getLocatorCommand(args.elementId)}.selectOption("${args.option}")`;
-        appendToFile(command);
-        await getLocator(args.elementId).selectOption(args.option);
+    // locator_selectOption: {
+    //   function: async (args: { elementId: string, option: string }) => {
+    //     const command = `${getLocatorCommand(args.elementId)}.selectOption("${args.option}")`;
+    //     appendToFile(command);
+    //     await getLocator(args.elementId).selectOption(args.option);
 
-        return { success: true };
-      },
-      name: "locator_selectOption",
-      description: "Select an option from a dropdown/select element.",
-      parse: (args: string) => {
-        return z
-          .object({
-            elementId: z.string(),
-            option: z.string(),
-          })
-          .parse(JSON.parse(args));
-      },
-      parameters: {
-        type: "object",
-        properties: {
-          elementId: {
-            type: "string",
-          },
-          option: {
-            type: "string",
-          },
-        },
-      },
-    },
+    //     return { success: true };
+    //   },
+    //   name: "locator_selectOption",
+    //   description: "Select an option from a dropdown/select element.",
+    //   parse: (args: string) => {
+    //     return z
+    //       .object({
+    //         elementId: z.string(),
+    //         option: z.string(),
+    //       })
+    //       .parse(JSON.parse(args));
+    //   },
+    //   parameters: {
+    //     type: "object",
+    //     properties: {
+    //       elementId: {
+    //         type: "string",
+    //       },
+    //       option: {
+    //         type: "string",
+    //       },
+    //     },
+    //   },
+    // },
     locator_count: {
       function: async (args: { elementId: string }) => {
         const command = `${getLocatorCommand(args.elementId)}.count()`;

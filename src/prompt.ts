@@ -23,6 +23,7 @@ export const prompt = (message: TaskMessage) => {
 * To whats in the description of the test. Nothing more, nothing less. Don't hallucinate.
 * If there are multiple elements in a tool response, pick one and try proceeding with this one. If it fails, try another one.
 * In case of selecting a value (VALUE_TO_SELECT) in a dropdown, try the following: getByRole('button', { name: 'Not selected' }).click() and then page.getByLabel('Not selected').getByText('VALUE_TO_SELECT').click()
+* if you get multiple elementIds back from a locateElement, thy the action you are supposed to do with each.
 
 Webpage snapshot:
 
